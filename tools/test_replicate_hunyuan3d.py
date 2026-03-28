@@ -5,16 +5,11 @@ import argparse
 import json
 import os
 import sys
-import time
 
-import requests
+from replicate.client import Client
+from replicate.exceptions import ModelError, ReplicateError
 
-MODEL_OWNER = "tencent"
-MODEL_NAME = "hunyuan-3d-3.1"
-PREDICTIONS_URL = f"https://api.replicate.com/v1/models/{MODEL_OWNER}/{MODEL_NAME}/predictions"
-POLL_INTERVAL_S = 3.0
-# 3D 生成耗时通常较长
-POLL_TIMEOUT_S = 2400
+MODEL_REF = "tencent/hunyuan-3d-3.1"
 
 DEFAULT_PROMPT = (
     "An elegant and opulent 3D chair shaped like an avocado, the outer shell forming a deep green "
@@ -25,34 +20,21 @@ DEFAULT_PROMPT = (
 )
 
 
-def _headers(token: str) -> dict[str, str]:
-    return {
-        "Authorization": f"Bearer {token}",
-        "Content-Type": "application/json",
-        "User-Agent": "TabletopGen hunyuan-3d-3.1 test",
-    }
-
-
-def wait_prediction(get_url: str, token: str) -> dict:
-    headers = _headers(token)
-    del headers["Content-Type"]
-    deadline = time.monotonic() + POLL_TIMEOUT_S
-    while time.monotonic() < deadline:
-        r = requests.get(get_url, headers=headers, timeout=120)
-        if r.status_code != 200:
-            print(f"错误: 轮询预测失败 HTTP {r.status_code}: {r.text[:500]}", file=sys.stderr)
-            sys.exit(1)
-        pred = r.json()
-        status = pred.get("status")
-        if status == "succeeded":
-            return pred
-        if status in ("failed", "canceled"):
-            err = pred.get("error") or pred.get("logs") or pred
-            print(f"错误: 预测 {status}: {err}", file=sys.stderr)
-            sys.exit(1)
-        time.sleep(POLL_INTERVAL_S)
-    print("错误: 等待预测结果超时。", file=sys.stderr)
-    sys.exit(1)
+def _print_output(out: object) -> None:
+    print("--- 输出（.glb 等资源的 URL）---")
+    if isinstance(out, str):
+        print(out)
+        return
+    if isinstance(out, list):
+        for item in out:
+            u = getattr(item, "url", None)
+            print(u if u is not None else item)
+        return
+    url = getattr(out, "url", None)
+    if url is not None:
+        print(url)
+        return
+    print(json.dumps(out, ensure_ascii=False, default=str, indent=2))
 
 
 def main() -> int:
@@ -90,55 +72,38 @@ def main() -> int:
         print("错误: prompt 超过模型上限 1024 字符。", file=sys.stderr)
         return 1
 
-    payload = {
-        "input": {
-            "prompt": args.prompt,
-            "enable_pbr": args.enable_pbr,
-            "face_count": args.face_count,
-            "generate_type": args.generate_type,
-        }
-    }
-
+    client = Client(api_token=token)
     try:
-        r = requests.post(
-            PREDICTIONS_URL,
-            headers=_headers(token),
-            json=payload,
-            timeout=60,
+        out = client.run(
+            MODEL_REF,
+            input={
+                "prompt": args.prompt,
+                "enable_pbr": args.enable_pbr,
+                "face_count": args.face_count,
+                "generate_type": args.generate_type,
+            },
+            use_file_output=False,
         )
-    except requests.RequestException as e:
-        print(f"错误: 创建预测失败（网络）: {e}", file=sys.stderr)
+    except ModelError as e:
+        pred = getattr(e, "prediction", None)
+        detail = getattr(pred, "error", None) if pred else None
+        logs = getattr(pred, "logs", None) if pred else None
+        print(f"错误: 模型预测失败: {e}", file=sys.stderr)
+        if detail:
+            print(detail, file=sys.stderr)
+        if logs:
+            print(logs, file=sys.stderr)
+        return 1
+    except ReplicateError as e:
+        print(f"错误: Replicate API: {e}", file=sys.stderr)
         return 1
 
-    try:
-        created = r.json()
-    except json.JSONDecodeError:
-        print(
-            f"错误: 创建预测响应不是 JSON。HTTP {r.status_code}, {r.text[:500]}",
-            file=sys.stderr,
-        )
-        return 1
-
-    if r.status_code not in (200, 201):
-        err = created.get("detail") or created.get("title") or created
-        print(f"错误: 创建预测 HTTP {r.status_code}: {err}", file=sys.stderr)
-        return 1
-
-    get_url = (created.get("urls") or {}).get("get")
-    if not get_url:
-        print("错误: 响应中无预测轮询 URL。", file=sys.stderr)
-        print(json.dumps(created, ensure_ascii=False, indent=2), file=sys.stderr)
-        return 1
-
-    pred = wait_prediction(get_url, token)
-    out = pred.get("output")
-    print(f"模型: {MODEL_OWNER}/{MODEL_NAME}")
-    print(f"generate_type: {args.generate_type}, face_count: {args.face_count}, enable_pbr: {args.enable_pbr}")
-    print("--- 输出（.glb 等资源的 URL）---")
-    if isinstance(out, str):
-        print(out)
-    else:
-        print(json.dumps(out, ensure_ascii=False, indent=2))
+    print(f"模型: {MODEL_REF}")
+    print(
+        f"generate_type: {args.generate_type}, face_count: {args.face_count}, "
+        f"enable_pbr: {args.enable_pbr}"
+    )
+    _print_output(out)
     return 0
 
 

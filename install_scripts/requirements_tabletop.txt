@@ -1,6 +1,7 @@
 pyyaml
 requests
 httpx
+replicate
 tqdm
 openai
 google-genai
