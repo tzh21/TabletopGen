@@ -111,23 +111,19 @@ python install_scripts/download_weights.py
 ## 🛠️ Usage
 
 ### 1. Configuration
-Before running the pipeline, please configure your API settings (e.g., OpenAI, Hunyuan3D, etc.) in the configuration file:
-```yaml
-# Edit this file with your own API settings
-configs/config.yaml
-```
+Set **Replicate** `replicate_api_token` in [`configs/config.yaml`](configs/config.yaml). For **OpenRouter**, you can either export **`OPENROUTER_API_KEY`** (recommended) or set **`gpt_api_key`** in the same file; optional fallback env name is **`GPT_API_KEY`**. `base_url` defaults to `https://openrouter.ai/api/v1`.
 
 ### 2. Generate Input Image (Optional)
-If you do not have an input image, you can generate one from text using `text2img.py`.
+If you do not have an input image, you can generate one from text using `text2img.py`. It uses **`replicate_api_token`** from [`configs/config.yaml`](configs/config.yaml) for Replicate, and the OpenRouter key from **`OPENROUTER_API_KEY`** (or **`GPT_API_KEY`**) in the environment, or **`gpt_api_key`** in the same YAML file, for prompt expansion.
+
 * **Arguments:**
-    * `--doubao_api_key`: Your API key for the generation service.
     * `--text`: Description of the scene (e.g., "A hobby desk with some model cars and tools.").
     * `--id` (Optional): Manually specify the generated image ID. If omitted, it auto-increments.
 * **Output:** Generated images will be saved in `scene_image/`.
 
 ```bash
 conda activate tabletopgen
-python text2img.py --doubao_api_key "YOUR_API_KEY" --text "A hobby desk with some model cars and tools."
+python text2img.py --text "A hobby desk with some model cars and tools."
 ```
 
 ### 3. Run Scene Generation Pipeline
@@ -202,10 +198,8 @@ We would like to express our gratitude to the following projects and services th
 
 - [Grounded-SAM-2](https://github.com/IDEA-Research/Grounded-SAM-2).
 - [BiRefNet](https://github.com/ZhengPeng7/BiRefNet).
-- [Hunyuan3D](https://3d.hunyuan.tencent.com/).
-- [Volcengine](https://www.volcengine.com/product/doubao).
-- [Google AI Studio](https://aistudio.google.com/).
-- [OpenAI](https://openai.com/).
+- [Hunyuan3D](https://3d.hunyuan.tencent.com/) (via [Replicate](https://replicate.com/tencent/hunyuan-3d-3.1)).
+- [Seedream](https://replicate.com/bytedance/seedream-4) on [Replicate](https://replicate.com/).
 - [OpenRouter](https://openrouter.ai/).
 
 ## 📝 Citation

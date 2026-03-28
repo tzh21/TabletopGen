@@ -1,8 +1,6 @@
 """
-Use doubao to perform object detection on the top view and get bounding boxes.
+Use OpenRouter (Seed 1.6 vision) for object detection on the top view and bounding boxes.
 """
-from google import genai
-from google.genai import types
 from PIL import Image, ImageDraw, ImageFont
 import json
 import os
@@ -10,12 +8,10 @@ import numpy as np
 from typing import Dict, List, Tuple
 from collections import defaultdict
 import base64
-from volcenginesdkarkruntime import Ark
 import io
 from modules.setup_openai_client import setup_openai_client
 
-# Doubao API configuration
-DEFAULT_MODEL = "doubao-seed-1-6-thinking-250715"
+DEFAULT_VISION_MODEL = "bytedance-seed/seed-1.6"
 BBOX_TAG_START = "<bbox>"
 BBOX_TAG_END = "</bbox>"
 
@@ -184,21 +180,29 @@ def reconcile_detection_labels_by_id(detection_results: Dict[str, List[int]], in
 
     return normalized, (not duplicate_found)
 
-def detect_objects_with_doubao(image_path, object_names, doubao_api_key, object_descriptions=None, max_retries=3):
-    """Use Doubao for object detection, supporting precise identification of objects of the same type"""
+def detect_objects_for_topview(
+    image_path,
+    object_names,
+    openai_api_key,
+    proxy_url,
+    base_url,
+    object_descriptions=None,
+    max_retries=3,
+):
+    """Vision-LM object detection via OpenRouter (Seed 1.6), including same-type disambiguation."""
     expected_count = len(object_names)
-    
+
     for retry_count in range(max_retries):
         try:
             if retry_count > 0:
                 print(f"Attempting detection {retry_count + 1}...")
-            
-            os.environ.pop("HTTP_PROXY", None)
-            os.environ.pop("HTTPS_PROXY", None)
-            if not doubao_api_key:
-                raise ValueError("请设置ARK_API_KEY环境变量")
-            
-            client = Ark(base_url="https://ark.cn-beijing.volces.com/api/v3", api_key=doubao_api_key)
+
+            if not openai_api_key:
+                raise ValueError(
+                    "Missing OpenRouter API key (OPENROUTER_API_KEY / GPT_API_KEY / gpt_api_key in config)"
+                )
+
+            client = setup_openai_client(openai_api_key, proxy_url, base_url)
             
             image = Image.open(image_path)
 
@@ -229,7 +233,7 @@ Return results in JSON format as an array with each object having 'label' (use t
 Example: [{{"category": "pen_1", "bbox": "<bbox>150 200 350 400</bbox>"}}, {{"category": "pen_2", "bbox": "<bbox>500 100 700 300</bbox>"}}]
 """
                 if retry_count == 0:
-                    print("Using Doubao for precise mode object detection...")
+                    print("Using Seed 1.6 for precise mode object detection...")
             else:
                 object_list = ", ".join(set(object_names))
                 prompt = f"""Detect all of the prominent items in the image, specifically looking for: {object_list}. 
@@ -237,20 +241,22 @@ Return results in JSON format as an array with each object having 'label' (use t
 Example: [{{"category": "pen", "bbox": "<bbox>150 200 350 400</bbox>"}}, {{"category": "notebook", "bbox": "<bbox>500 100 700 300</bbox>"}}]
 """
                 if retry_count == 0:
-                    print("Using Doubao for standard mode object detection...")
-            
+                    print("Using Seed 1.6 for standard mode object detection...")
+
             response = client.chat.completions.create(
-                model=DEFAULT_MODEL,
-                messages=[{
-                    "role": "user",
-                    "content": [{
-                        "type": "image_url",
-                        "image_url": {"url": f"data:image/png;base64,{base64_image}"}
-                    }, {
-                        "type": "text",
-                        "text": prompt
-                    }]
-                }]
+                model=DEFAULT_VISION_MODEL,
+                messages=[
+                    {
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "image_url",
+                                "image_url": {"url": f"data:image/png;base64,{base64_image}"},
+                            },
+                            {"type": "text", "text": prompt},
+                        ],
+                    }
+                ],
             )
             
             response_text = response.choices[0].message.content
@@ -417,7 +423,7 @@ def draw_bounding_boxes_with_ids(image, detection_results, output_path):
         print(f"Failed to draw bounding boxes: {e}")
         return False
 
-def topview_bbox_enhanced_main(output_assets_dir, comfy_image_dir, doubao_api_key, openai_api_key, proxy_url, base_url):
+def topview_bbox_enhanced_main(output_assets_dir, comfy_image_dir, openai_api_key, proxy_url, base_url):
     """Enhanced main function"""
     try:
         scene_image_path = os.path.join(output_assets_dir, "image", "topview_scene.png")
@@ -469,9 +475,13 @@ def topview_bbox_enhanced_main(output_assets_dir, comfy_image_dir, doubao_api_ke
         elif multi_instance_classes:
             print(f"Warning: Multiple objects of same type detected but numbered annotation image not found: {annotated_image_path}")
         
-        # Use Doubao for object detection
-        scene_image, detection_results, image_size = detect_objects_with_doubao(
-            scene_image_path, object_names, doubao_api_key, object_descriptions=object_descriptions
+        scene_image, detection_results, image_size = detect_objects_for_topview(
+            scene_image_path,
+            object_names,
+            openai_api_key,
+            proxy_url,
+            base_url,
+            object_descriptions=object_descriptions,
         )
         
         if scene_image is None or not detection_results:
@@ -504,10 +514,9 @@ def topview_bbox_enhanced_main(output_assets_dir, comfy_image_dir, doubao_api_ke
         return False
 
 if __name__ == "__main__":
-    # Example usage
     output_assets_dir = "output_scene/scene_1/output_assets"
     comfy_image_dir = "output_scene/scene_1/comfy_image"
-    doubao_api_key = "your_doubao_api_key"  # Replace with your Doubao API Key
-    openai_api_key = "sk-xxxxxx"  # Replace with your OpenAI API Key
-    proxy_url = "http://your-proxy-url:port"  # Replace with your proxy URL
-    base_url = "https://api.openai.com/v1"  # Replace with your OpenAI API base URL
+    openai_api_key = "sk-xxxxxx"
+    proxy_url = "http://your-proxy-url:port"
+    base_url = "https://openrouter.ai/api/v1"
+    topview_bbox_enhanced_main(output_assets_dir, comfy_image_dir, openai_api_key, proxy_url, base_url)

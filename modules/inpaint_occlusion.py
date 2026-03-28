@@ -7,10 +7,9 @@ import os
 import sys
 import shutil
 from modules.seg_one_Bi import seg_obj
-import requests
 import time
-from modules.seedream40_API import image_to_base64
-from volcenginesdkarkruntime import Ark
+from modules.seedream40_API import _write_adjusted_png_temp
+from modules.replicate_client import run_seedream4_to_file
 
 def generate_inpaint_prompt(occluded_object, occluding_objects):
     """
@@ -60,42 +59,33 @@ def update_segmentation_results(segmentation_data, object_id, updates, json_path
         print(f"Error updating segmentation results: {e}")
         return False
     
-def seedream_object_api(image_path1, prompt, output_path, ark_api_key=None):
+def seedream_object_api(image_path1, prompt, output_path, replicate_api_token=None):
     """
-    Generate object image using Seedream 4.0
+    Generate object image using Seedream 4 on Replicate (single reference image).
     """
-    # Initialize Ark client
-    client = Ark(
-        base_url="https://ark.cn-beijing.volces.com/api/v3",
-        api_key=ark_api_key or os.environ.get("ARK_API_KEY"),
-    )
-    
-    image1_base64 = image_to_base64(image_path1)
-    
-    
-    images_response = client.images.generate(
-        model="doubao-seedream-4-0-250828",
-        prompt=prompt,
-        image=[image1_base64],
-        size="2K",
-        response_format="url",
-        watermark=False,
-        sequential_image_generation="disabled" 
-    )
-    
-    image_url = images_response.data[0].url
-    
-    response = requests.get(image_url, timeout=120)
-    if response.status_code == 200:
-        with open(output_path, "wb") as f:
-            f.write(response.content)
+    tmp = _write_adjusted_png_temp(image_path1)
+    try:
+        image_url = run_seedream4_to_file(
+            prompt,
+            output_path,
+            image_paths=[tmp],
+            replicate_api_token=replicate_api_token,
+            size="2K",
+            aspect_ratio="match_input_image",
+            sequential_image_generation="disabled",
+            max_images=1,
+            enhance_prompt=True,
+        )
         print(f"Image saved to: {output_path}")
-    else:
-        raise RuntimeError(f"Failed to download image, status code: {response.status_code}")
-    
-    return image_url
+        return image_url
+    finally:
+        try:
+            if os.path.exists(tmp):
+                os.remove(tmp)
+        except OSError:
+            pass
 
-def process_occluded_objects(json_path, output_dir, final_seg_output_dir, ark_api_key=None):
+def process_occluded_objects(json_path, output_dir, final_seg_output_dir, replicate_api_token=None):
     """
     Process all occluded objects.
     """
@@ -166,7 +156,7 @@ def process_occluded_objects(json_path, output_dir, final_seg_output_dir, ark_ap
                 image_path1=absolute_input_image_path,
                 prompt=inpaint_prompt,
                 output_path=expected_inpainted_path,
-                ark_api_key=ark_api_key
+                replicate_api_token=replicate_api_token,
             )
         
 
@@ -193,7 +183,7 @@ def process_occluded_objects(json_path, output_dir, final_seg_output_dir, ark_ap
                 image_path1=absolute_inpainted_path,
                 prompt=redraw_prompt,
                 output_path=expected_redrawn_path,
-                ark_api_key=ark_api_key
+                replicate_api_token=replicate_api_token,
             )
 
         if not os.path.exists(expected_redrawn_path):
@@ -230,7 +220,7 @@ def process_occluded_objects(json_path, output_dir, final_seg_output_dir, ark_ap
     
     return processed_files
 
-def run_inpaint_pipeline(segmentation_json_path, output_dir, final_seg_output_dir, ark_api_key):
+def run_inpaint_pipeline(segmentation_json_path, output_dir, final_seg_output_dir, replicate_api_token):
     """
     Execute the complete occlusion inpainting pipeline.
     """
@@ -254,7 +244,7 @@ def run_inpaint_pipeline(segmentation_json_path, output_dir, final_seg_output_di
             segmentation_json_path,
             output_dir,
             final_seg_output_dir,
-            ark_api_key=ark_api_key
+            replicate_api_token=replicate_api_token,
         )
     finally:
         pass
@@ -297,13 +287,13 @@ if __name__ == "__main__":
     segmentation_json_path = "output_scene/scene_1/output_assets/segmentation/segmentation_results.json"
     output_dir = "output_scene/scene_1/output_assets/inpainting"
     final_seg_output_dir = "output_scene/scene_1/output_assets/inpainting/final_segmentation"
-    ark_api_key = "" 
+    token = os.environ.get("REPLICATE_API_TOKEN", "")
 
     success, missing = run_inpaint_pipeline(
         segmentation_json_path,
         output_dir,
         final_seg_output_dir,
-        ark_api_key
+        token,
     )
 
     if success:

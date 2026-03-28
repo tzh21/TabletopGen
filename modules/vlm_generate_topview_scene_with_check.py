@@ -9,10 +9,10 @@ import openai
 from PIL import Image
 from io import BytesIO
 import PIL.Image
-from volcenginesdkarkruntime import Ark
 import base64
-import requests
 from modules.setup_openai_client import setup_openai_client
+from modules.seedream40_API import _write_adjusted_png_temp
+from modules.replicate_client import run_seedream4_to_file
 
 
 def judge_topview_quality(original_image_path, generated_image_path, openai_client):
@@ -58,48 +58,30 @@ Please only answer "YES" or "NO". "YES" means all criteria are met, "NO" means o
         print(f"GPT judgment failed: {e}")
         return False
     
-def image_to_base64(image_path):
-    """Convert a local image to base64 encoding"""
-    with open(image_path, "rb") as f:
-        image_data = f.read()
-
-    ext = os.path.splitext(image_path)[1].lower().replace('.', '')
-    if ext == 'jpg':
-        ext = 'jpeg'
-    base64_str = base64.b64encode(image_data).decode('utf-8')
-    return f"data:image/{ext};base64,{base64_str}"
-    
-def generate_topview_with_seedream(image_path, output_path, prompt, ark_api_key=None):
-    client = Ark(
-        base_url="https://ark.cn-beijing.volces.com/api/v3",
-        api_key=ark_api_key or os.environ.get("ARK_API_KEY"),
-    )
-    
-    image1_base64 = image_to_base64(image_path)
-
-    images_response = client.images.generate(
-        model="doubao-seedream-4-0-250828",
-        prompt=prompt,
-        image = [image1_base64],
-        size="2K",
-        response_format="url",
-        watermark=False,
-        sequential_image_generation="disabled"
-    )
-    
-    image_url = images_response.data[0].url
-    
-    response = requests.get(image_url, timeout=120)
-    if response.status_code == 200:
-        with open(output_path, "wb") as f:
-            f.write(response.content)
-    else:
-        raise RuntimeError(f"Failed to download image, status code: {response.status_code}")
-    
-    return image_url
+def generate_topview_with_seedream(image_path, output_path, prompt, replicate_api_token=None):
+    tmp = _write_adjusted_png_temp(image_path)
+    try:
+        image_url = run_seedream4_to_file(
+            prompt,
+            output_path,
+            image_paths=[tmp],
+            replicate_api_token=replicate_api_token,
+            size="2K",
+            aspect_ratio="match_input_image",
+            sequential_image_generation="disabled",
+            max_images=1,
+            enhance_prompt=True,
+        )
+        return image_url
+    finally:
+        try:
+            if os.path.exists(tmp):
+                os.remove(tmp)
+        except OSError:
+            pass
 
 
-def generate_topview_scene(input_image_path, output_image_path, seedream_api_key, openai_api_key, proxy_url, base_url, max_attempts=10):
+def generate_topview_scene(input_image_path, output_image_path, replicate_api_token, openai_api_key, proxy_url, base_url, max_attempts=10):
     """
     Generate a top-down view of the scene.
     """
@@ -126,10 +108,10 @@ def generate_topview_scene(input_image_path, output_image_path, seedream_api_key
                 temp_files.append(temp_path)
                 
                 image_url = generate_topview_with_seedream(
-                    input_image_path, 
-                    temp_path, 
-                    text_input, 
-                    seedream_api_key
+                    input_image_path,
+                    temp_path,
+                    text_input,
+                    replicate_api_token,
                 )
                 
                 print(f"Seedream generation {attempt} saved to: {temp_path}")
@@ -170,13 +152,13 @@ if __name__ == '__main__':
         input_image_path = f"output_scene/scene_{id}/comfy_image/refined_scene_image.png"
         output_image_path = f"output_scene/scene_{id}/output_assets/image/topview_scene.png"
         
-        seedream_api_key = ""  # Replace with your Seedream API Key
+        replicate_token = os.environ.get("REPLICATE_API_TOKEN", "")
         openai_api_key = "sk-xxxxxx"  # Replace with your OpenAI API Key
         proxy_url = "http://your-proxy-url:port"  # Replace with your proxy URL
         base_url = "https://api.openai.com/v1"  # Replace with your OpenAI API base URL
 
         print("Starting to generate scene top view...")
-        success = generate_topview_scene(input_image_path, output_image_path, seedream_api_key, openai_api_key, proxy_url, base_url)
+        success = generate_topview_scene(input_image_path, output_image_path, replicate_token, openai_api_key, proxy_url, base_url)
         
             
     except Exception as e:

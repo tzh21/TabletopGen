@@ -10,7 +10,6 @@ import shutil
 import logging
 import argparse
 from pathlib import Path
-from google import genai
 import yaml
 
 # Import configuration module
@@ -18,7 +17,7 @@ from configs.pipeline_config import (
     get_pipeline_dir, get_scene_dir, get_comfy_image_dir,
     get_output_assets_dir, set_working_directory_to_scene,
     restore_working_directory, get_output_scene_dir,
-    get_next_scene_id
+    get_next_scene_id, resolve_openrouter_api_key,
 )
 
 
@@ -40,19 +39,14 @@ def load_config(config_path: Path | str | None = None):
         raise RuntimeError(f"Failed to read configuration file: {e}")
 
     api_cfg = cfg.get("api_keys", {}) or {}
-    required = {
-        "doubao": "DOUBAO_API_KEY",
-        "hunyuan_secret_id": "HY_SECRET_ID",
-        "hunyuan_secret_key": "HY_SECRET_KEY",
-        "gpt_api_key": "GPT_API_KEY",
-    }
 
-    values = {}
-    for key, env_name in required.items():
-        val = api_cfg.get(key)
-        if val is None or str(val).strip() == "":
-            raise ValueError(f"Missing or empty configuration: api_keys.{key} ({env_name})")
-        values[env_name] = str(val).strip()
+    rep_val = api_cfg.get("replicate_api_token")
+    if rep_val is None or str(rep_val).strip() == "":
+        raise ValueError(
+            "Missing or empty configuration: api_keys.replicate_api_token (REPLICATE_API_TOKEN)"
+        )
+    values = {"REPLICATE_API_TOKEN": str(rep_val).strip()}
+    values["GPT_API_KEY"] = resolve_openrouter_api_key(api_cfg)
 
     base_url = api_cfg.get("base_url")
     if base_url is None or str(base_url).strip() == "":
@@ -90,11 +84,12 @@ os.environ['PIPELINE_DIR'] = PIPELINE_DIR
 
 # Load configuration
 CONFIG_VALUES, _RAW_CONFIG = load_config()
-HY_SECRET_ID = CONFIG_VALUES["HY_SECRET_ID"]
-HY_SECRET_KEY = CONFIG_VALUES["HY_SECRET_KEY"]
-DOUBAO_API_KEY = CONFIG_VALUES["DOUBAO_API_KEY"]
+REPLICATE_API_TOKEN = CONFIG_VALUES["REPLICATE_API_TOKEN"]
 GPT_API_KEY = CONFIG_VALUES["GPT_API_KEY"]
 BASE_URL = CONFIG_VALUES["BASE_URL"]
+os.environ["REPLICATE_API_TOKEN"] = REPLICATE_API_TOKEN
+if GPT_API_KEY:
+    os.environ.setdefault("OPENROUTER_API_KEY", GPT_API_KEY)
 PROXY_URL = os.environ.get("HTTP_PROXY")  # If no proxy is configured, this will be None
 
 
@@ -173,13 +168,13 @@ def step2_inpaint_occlusion(scene_dir):
         original_cwd = set_working_directory_to_scene(scene_dir)
         
         try:
-            success, missing = run_inpaint_pipeline(segmentation_json_path, output_dir, final_seg_output_dir, DOUBAO_API_KEY)
+            success, missing = run_inpaint_pipeline(segmentation_json_path, output_dir, final_seg_output_dir, REPLICATE_API_TOKEN)
 
             if missing:
                 print(f"The following objects are missing: {', '.join(missing)}")
             while not success:
                 logger.info("Retrying occlusion repair...")
-                success, missing = run_inpaint_pipeline(segmentation_json_path, output_dir, final_seg_output_dir, DOUBAO_API_KEY)
+                success, missing = run_inpaint_pipeline(segmentation_json_path, output_dir, final_seg_output_dir, REPLICATE_API_TOKEN)
 
             logger.info("Step 2 completed: Occlusion repair done")
             return True
@@ -206,9 +201,7 @@ def step3_generate_3d_models_api(scene_dir):
         result = redraw_and_3dgen_api(
             segmentation_json_path=segmentation_json_path,
             output_dir=output_dir,
-            hunyuan_secret_id=HY_SECRET_ID,
-            hunyuan_secret_key=HY_SECRET_KEY,
-            seedream_api_key=DOUBAO_API_KEY
+            replicate_api_token=REPLICATE_API_TOKEN,
         )
 
         if not result:
@@ -401,14 +394,14 @@ def step6_position_estimation(scene_dir):
         try:
             # 6.1 Generate top view
             logger.info("6.1 Generating top view...")
-            success_6_1 = generate_topview_scene(scene_image_path, os.path.join(output_assets_dir, "image", "topview_scene.png"), DOUBAO_API_KEY, GPT_API_KEY, PROXY_URL, BASE_URL)
+            success_6_1 = generate_topview_scene(scene_image_path, os.path.join(output_assets_dir, "image", "topview_scene.png"), REPLICATE_API_TOKEN, GPT_API_KEY, PROXY_URL, BASE_URL)
             if not success_6_1:
                 logger.error("6.1 Generating top view failed")
                 return False
 
             # 6.2 Analyze top view bounding box
             logger.info("6.2 Analyzing top view bounding box...")
-            success_6_2 = topview_bbox_enhanced_main(output_assets_dir, comfy_image_dir, DOUBAO_API_KEY, GPT_API_KEY, PROXY_URL, BASE_URL)
+            success_6_2 = topview_bbox_enhanced_main(output_assets_dir, comfy_image_dir, GPT_API_KEY, PROXY_URL, BASE_URL)
             if not success_6_2:
                 logger.error("6.2 Analyzing top view bounding box failed")
                 return False

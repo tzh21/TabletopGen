@@ -4,9 +4,6 @@ httpx
 replicate
 tqdm
 openai
-google-genai
-tencentcloud-sdk-python-ai3d
-volcengine-python-sdk[ark]
 pillow
 opencv-python-headless
 pycocotools

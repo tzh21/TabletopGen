@@ -1,11 +1,8 @@
 api_keys:
-  # Doubao API
-  doubao: ""
-  # Hunyuan3D API
-  hunyuan_secret_id: ""
-  hunyuan_secret_key: ""
-  # OpenRouter API
-  gpt_api_key: "" 
+  # Replicate API (Seedream 4, Hunyuan 3D 3.1)
+  replicate_api_token: ""
+  # OpenRouter-compatible API (optional if OPENROUTER_API_KEY or GPT_API_KEY is set)
+  gpt_api_key: ""
   base_url: "https://openrouter.ai/api/v1"
 
 # Set up proxy settings (if needed)

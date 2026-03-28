@@ -25,7 +25,7 @@ def is_multi_object(class_name, all_class_names):
             return True
     return False
 
-def redraw_and_3dgen_api(segmentation_json_path, output_dir, hunyuan_secret_id, hunyuan_secret_key, seedream_api_key):
+def redraw_and_3dgen_api(segmentation_json_path, output_dir, replicate_api_token):
     """
     Redraw all objects and generate 3D GLB files based on the segmentation result JSON.
     """
@@ -77,7 +77,7 @@ def redraw_and_3dgen_api(segmentation_json_path, output_dir, hunyuan_secret_id, 
                 output_path=redraw_image_path,
                 is_main_obj=is_main_obj,
                 is_multi=is_multi,
-                ark_api_key=seedream_api_key
+                replicate_api_token=replicate_api_token,
             )
             
             obj['redraw_image_path'] = redraw_image_path
@@ -120,10 +120,9 @@ def redraw_and_3dgen_api(segmentation_json_path, output_dir, hunyuan_secret_id, 
         
         try:
             gen_single_obj_hy3dapi(
-                SecretId=hunyuan_secret_id,
-                SecretKey=hunyuan_secret_key,
-                image_path=redraw_image_path,
-                output_glb_path=glb_path
+                replicate_api_token,
+                redraw_image_path,
+                glb_path,
             )
             
             print(f"3D model generation completed: {glb_path}")
@@ -213,18 +212,15 @@ def redraw_and_3dgen_api(segmentation_json_path, output_dir, hunyuan_secret_id, 
     return seg_data
 
 if __name__ == "__main__":
-    # Example usage
+    import os
+
     segmentation_json_path = "output_scene/scene_1/output_assets/image/segmentation_results.json"
     output_dir = "output_scene/scene_1/output_assets"
 
-    hunyuan_secret_id = ""
-    hunyuan_secret_key = ""
-    seedream_api_key = ""
-    
+    token = os.environ.get("REPLICATE_API_TOKEN", "")
+
     result = redraw_and_3dgen_api(
         segmentation_json_path=segmentation_json_path,
         output_dir=output_dir,
-        hunyuan_secret_id=hunyuan_secret_id,
-        hunyuan_secret_key=hunyuan_secret_key,
-        seedream_api_key=seedream_api_key
+        replicate_api_token=token,
     )

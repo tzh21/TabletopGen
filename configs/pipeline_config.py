@@ -4,6 +4,27 @@ Pipeline Configuration Module.
 
 import os
 from pathlib import Path
+from typing import Any, Mapping, Optional
+
+
+def resolve_openrouter_api_key(api_keys_section: Optional[Mapping[str, Any]] = None) -> str:
+    """
+    Resolve the OpenRouter-compatible API key (used as Bearer token).
+
+    Precedence: OPENROUTER_API_KEY, then GPT_API_KEY, then api_keys.gpt_api_key from YAML.
+    """
+    api = dict(api_keys_section or {})
+    for env_name in ("OPENROUTER_API_KEY", "GPT_API_KEY"):
+        v = os.environ.get(env_name, "").strip()
+        if v:
+            return v
+    yaml_key = (api.get("gpt_api_key") or "").strip()
+    if yaml_key:
+        return yaml_key
+    raise ValueError(
+        "Missing OpenRouter API key: set environment variable OPENROUTER_API_KEY "
+        "(or GPT_API_KEY), or api_keys.gpt_api_key in configs/config.yaml"
+    )
 
 
 # Project root directory (parent of configs)
