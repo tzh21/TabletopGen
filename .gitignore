@@ -31,3 +31,4 @@ env/
 !install_scripts/*.txt
 
 /scripts
+/local
