@@ -29,3 +29,5 @@ env/
 # === Explicitly keep necessary scripts ===
 !install_scripts/*.py
 !install_scripts/*.txt
+
+/scripts
