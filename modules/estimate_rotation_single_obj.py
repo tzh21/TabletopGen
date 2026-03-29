@@ -25,6 +25,8 @@ except Exception:
 
 import cv2
 
+from configs.pipeline_config import resolve_openrouter_chat_model
+
 # PyTorch3D
 from pytorch3d.io import load_objs_as_meshes
 from pytorch3d.renderer import (
@@ -839,7 +841,9 @@ def resolve_180_with_gpt(
     }]
 
     try:
-        gpt_resp = client.chat.completions.create(model="openai/gpt-4.1", messages=messages)
+        gpt_resp = client.chat.completions.create(
+            model=resolve_openrouter_chat_model(), messages=messages
+        )
         gpt_text = gpt_resp.choices[0].message.content.strip()
         print("[GPT raw output]\n" + gpt_text)
         choice = extract_last_choice_1_or_2(gpt_text)

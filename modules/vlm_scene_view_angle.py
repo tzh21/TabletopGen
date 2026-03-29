@@ -12,6 +12,7 @@ import pyrender
 from PIL import Image
 from modules.render_sized_mesh import process_sized_mesh_rendering
 from modules.render_glb_image import setup_pyrender_offscreen
+from configs.pipeline_config import resolve_openrouter_chat_model
 from modules.setup_openai_client import setup_openai_client
 
 logging.basicConfig(
@@ -44,7 +45,7 @@ def analyze_scene_view_angle(client, scene_image_path):
 Think carefully, output the detailed reasoning process.
 Finally, on a separate line, only output the final degree (in int format, e.g.: 50)"""
 
-        logger.info("Analyzing scene view angle with GPT-4.1...")
+        logger.info("Analyzing scene view angle with OpenRouter chat model...")
         
         input_messages = [
             {
@@ -57,7 +58,7 @@ Finally, on a separate line, only output the final degree (in int format, e.g.: 
         ]
 
         response = client.chat.completions.create(
-            model="openai/gpt-4.1",
+            model=resolve_openrouter_chat_model(),
             messages=input_messages
         )
         content = response.choices[0].message.content.strip()

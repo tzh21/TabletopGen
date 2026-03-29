@@ -10,6 +10,7 @@ from PIL import Image
 from io import BytesIO
 import PIL.Image
 import base64
+from configs.pipeline_config import resolve_openrouter_chat_model
 from modules.setup_openai_client import setup_openai_client
 from modules.seedream40_API import _write_adjusted_png_temp
 from modules.replicate_client import run_seedream4_to_file
@@ -47,7 +48,7 @@ Please only answer "YES" or "NO". "YES" means all criteria are met, "NO" means o
         ]
 
         response = openai_client.chat.completions.create(
-            model="openai/gpt-4.1",
+            model=resolve_openrouter_chat_model(),
             messages=input_messages,
         )
         

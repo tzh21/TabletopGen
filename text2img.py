@@ -12,7 +12,7 @@ from pathlib import Path
 
 import yaml
 
-from configs.pipeline_config import resolve_openrouter_api_key
+from configs.pipeline_config import resolve_openrouter_api_key, resolve_openrouter_chat_model
 from modules.replicate_client import run_seedream4_to_file
 from modules.setup_openai_client import setup_openai_client
 
@@ -30,12 +30,13 @@ def _load_api_config():
     return {
         "gpt_api_key": resolve_openrouter_api_key(api),
         "base_url": (api.get("base_url") or "https://openrouter.ai/api/v1").strip(),
+        "chat_model": resolve_openrouter_chat_model(api),
         "replicate_api_token": rep,
         "http_proxy": (proxy_cfg.get("http") or "").strip() or None,
     }
 
 
-def generate_scene_prompt(scene_description, client):
+def generate_scene_prompt(scene_description, client, chat_model):
     """
     Generate asset list json based on scene description
     """
@@ -57,7 +58,7 @@ You are a 3D scene layout prompt designer. Your task is to Infer the possible it
 Only output a short final prompt. The scene description is :"{scene_description}" """
 
     response = client.chat.completions.create(
-        model="openai/gpt-4.1",
+        model=chat_model,
         messages=[{"role": "user", "content": prompt}],
     )
 
@@ -187,7 +188,7 @@ if __name__ == "__main__":
 
     input_text = args.text
     print("Generating scene prompt...")
-    scene_prompt = generate_scene_prompt(input_text, client)
+    scene_prompt = generate_scene_prompt(input_text, client, conf["chat_model"])
     print(f"Scene prompt: {scene_prompt}")
 
     PIPELINE_DIR = os.path.dirname(os.path.abspath(__file__))

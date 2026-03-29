@@ -4,6 +4,8 @@ api_keys:
   # OpenRouter-compatible API (optional if OPENROUTER_API_KEY or GPT_API_KEY is set)
   gpt_api_key: ""
   base_url: "https://openrouter.ai/api/v1"
+  # OpenRouter text/vision chat (was openai/gpt-4.1 and openai/gpt-5); override with OPENROUTER_CHAT_MODEL
+  chat_model: "qwen/qwen3.5-plus-02-15"
 
 # Set up proxy settings (if needed)
 proxy:

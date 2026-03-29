@@ -14,6 +14,7 @@ from modules.rotate_glb import rotate_glb
 import logging
 import shutil
 from modules.render_glb_image import render_glb_with_pyrender, setup_pyrender_offscreen
+from configs.pipeline_config import resolve_openrouter_chat_model
 from modules.setup_openai_client import setup_openai_client
 
 logging.basicConfig(
@@ -65,11 +66,10 @@ The object description list is:
         ]
 
         response = client.chat.completions.create(
-            model="openai/gpt-5",
+            model=resolve_openrouter_chat_model(),
             messages=input_messages,
             temperature=1.0,
             top_p=1.0,
-            store=True,
             max_tokens=2048
         )
         content = response.choices[0].message.content.strip()

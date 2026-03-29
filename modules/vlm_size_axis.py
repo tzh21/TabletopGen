@@ -4,6 +4,7 @@ Analyze scene images and extract common sense dimensions and coordinate axis inf
 
 import json
 import os
+from configs.pipeline_config import resolve_openrouter_chat_model
 from modules.setup_openai_client import setup_openai_client
 
 
@@ -93,7 +94,7 @@ The **object list** in the figure is: {object_names}"""
             }
         ]
         response = client.chat.completions.create(
-            model="google/gemini-2.5-pro",
+            model=resolve_openrouter_chat_model(),
             messages=input_messages
         )
         response_text = response.choices[0].message.content.strip()

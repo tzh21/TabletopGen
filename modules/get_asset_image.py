@@ -16,6 +16,7 @@ import base64
 import logging
 from torchvision.ops import box_convert
 import sys
+from configs.pipeline_config import resolve_openrouter_chat_model
 from modules.setup_openai_client import setup_openai_client
 
 
@@ -49,7 +50,7 @@ def detect_objects_with_gpt(client, image_path):
         image_base64 = base64.b64encode(image_data).decode('utf-8')
         
         # Send request to GPT to analyze objects and detailed occlusion relationships in the image
-        logger.info("Using GPT-4.1 to recognize objects and detailed occlusion relationships in the image...")
+        logger.info("Using OpenRouter chat model to recognize objects and occlusion relationships...")
         messages=[
             {
                 "role": "user", 
@@ -105,7 +106,7 @@ Notes:
         ]
 
         response = client.chat.completions.create(
-            model="openai/gpt-4.1",
+            model=resolve_openrouter_chat_model(),
             messages=messages,
             response_format={"type": "json_object"}
         )
@@ -772,9 +773,9 @@ Notes:
                 {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{img_base64}"}}
             )
         
-        logger.info("Using GPT-4.1 to analyze which specific object IDs are occluded...")
+        logger.info("Using OpenRouter chat model to analyze which specific object IDs are occluded...")
         response = client.chat.completions.create(
-            model="openai/gpt-4.1",
+            model=resolve_openrouter_chat_model(),
             messages=[{"role": "user", "content": content}],
             response_format={"type": "json_object"}
         )
@@ -867,7 +868,7 @@ def get_asset_image_main(image, api_key, proxy_url, base_url, output_assets_dir,
             logger.info(f"Using user-provided prompt: {text_prompt}")
             logger.info(f"Main object of the scene: {main_object}")
         else:
-            logger.info("Using GPT-4.1 to detect objects and occlusion relationships in the image...")
+            logger.info("Using OpenRouter chat model to detect objects and occlusion relationships...")
             client = setup_openai_client(api_key, proxy_url, base_url)
             text_prompt, occluded_categories, occlusion_info, main_object = detect_objects_with_gpt(client, image_path)
         

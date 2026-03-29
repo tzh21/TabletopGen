@@ -6,6 +6,7 @@ import json
 import os
 from google import genai
 from google.genai import types
+from configs.pipeline_config import resolve_openrouter_chat_model
 from modules.setup_openai_client import setup_openai_client
 
 
@@ -73,7 +74,7 @@ The object list is as follows:
             }
         ]
         response = client.chat.completions.create(
-            model="openai/gpt-5",
+            model=resolve_openrouter_chat_model(),
             messages=input_messages
         )
         content = response.choices[0].message.content.strip()

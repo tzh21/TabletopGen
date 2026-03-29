@@ -6,6 +6,14 @@ import os
 from pathlib import Path
 from typing import Any, Mapping, Optional
 
+import yaml
+
+# OpenRouter model id for text / vision chat (replaces former GPT-4.1 / GPT-5 routes).
+DEFAULT_OPENROUTER_CHAT_MODEL = "qwen/qwen3.5-plus-02-15"
+
+# Project root directory (parent of configs); needed before YAML helpers.
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+
 
 def resolve_openrouter_api_key(api_keys_section: Optional[Mapping[str, Any]] = None) -> str:
     """
@@ -27,8 +35,39 @@ def resolve_openrouter_api_key(api_keys_section: Optional[Mapping[str, Any]] = N
     )
 
 
-# Project root directory (parent of configs)
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
+def _api_keys_from_default_config_yaml() -> dict[str, Any]:
+    cfg_path = PROJECT_ROOT / "configs" / "config.yaml"
+    if not cfg_path.is_file():
+        return {}
+    try:
+        with open(cfg_path, "r", encoding="utf-8") as f:
+            cfg = yaml.safe_load(f) or {}
+        return dict(cfg.get("api_keys", {}) or {})
+    except Exception:
+        return {}
+
+
+def resolve_openrouter_chat_model(api_keys_section: Optional[Mapping[str, Any]] = None) -> str:
+    """
+    OpenRouter chat model for GPT-compatible text/vision calls.
+
+    Precedence: api_keys.chat_model from YAML, then OPENROUTER_CHAT_MODEL, then default.
+    When api_keys_section is None, reads api_keys from configs/config.yaml if present.
+    """
+    api = (
+        dict(api_keys_section)
+        if api_keys_section is not None
+        else _api_keys_from_default_config_yaml()
+    )
+    yaml_model = (api.get("chat_model") or "").strip()
+    if yaml_model:
+        return yaml_model
+    env_model = os.environ.get("OPENROUTER_CHAT_MODEL", "").strip()
+    if env_model:
+        return env_model
+    return DEFAULT_OPENROUTER_CHAT_MODEL
+
+
 PIPELINE_DIR = PROJECT_ROOT
 
 

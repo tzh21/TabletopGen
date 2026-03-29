@@ -1,5 +1,6 @@
 """
-Use OpenRouter (Seed 1.6 vision) for object detection on the top view and bounding boxes.
+Use OpenRouter for object detection on the top view and bounding boxes (Seed 1.6 for bboxes;
+same-type descriptions use the configured chat model, default Qwen 3.5).
 """
 from PIL import Image, ImageDraw, ImageFont
 import json
@@ -9,6 +10,7 @@ from typing import Dict, List, Tuple
 from collections import defaultdict
 import base64
 import io
+from configs.pipeline_config import resolve_openrouter_chat_model
 from modules.setup_openai_client import setup_openai_client
 
 DEFAULT_VISION_MODEL = "bytedance-seed/seed-1.6"
@@ -106,7 +108,7 @@ Example: {{"pen_1": "blue ballpoint pen on the left side", "pen_2": "red pen in 
             }
         ]
         response = client.chat.completions.create(
-            model="google/gemini-2.5-pro",
+            model=resolve_openrouter_chat_model(),
             messages=input_messages
         )
         content = response.choices[0].message.content.strip()
