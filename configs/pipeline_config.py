@@ -11,19 +11,19 @@ def resolve_openrouter_api_key(api_keys_section: Optional[Mapping[str, Any]] = N
     """
     Resolve the OpenRouter-compatible API key (used as Bearer token).
 
-    Precedence: OPENROUTER_API_KEY, then GPT_API_KEY, then api_keys.gpt_api_key from YAML.
+    Precedence: api_keys.gpt_api_key from YAML, then OPENROUTER_API_KEY, then GPT_API_KEY.
     """
     api = dict(api_keys_section or {})
+    yaml_key = (api.get("gpt_api_key") or "").strip()
+    if yaml_key:
+        return yaml_key
     for env_name in ("OPENROUTER_API_KEY", "GPT_API_KEY"):
         v = os.environ.get(env_name, "").strip()
         if v:
             return v
-    yaml_key = (api.get("gpt_api_key") or "").strip()
-    if yaml_key:
-        return yaml_key
     raise ValueError(
-        "Missing OpenRouter API key: set environment variable OPENROUTER_API_KEY "
-        "(or GPT_API_KEY), or api_keys.gpt_api_key in configs/config.yaml"
+        "Missing OpenRouter API key: set api_keys.gpt_api_key in configs/config.yaml, "
+        "or environment variable OPENROUTER_API_KEY (or GPT_API_KEY)"
     )
 
 

@@ -42,10 +42,14 @@ def load_config(config_path: Path | str | None = None):
 
     rep_val = api_cfg.get("replicate_api_token")
     if rep_val is None or str(rep_val).strip() == "":
+        rep_val = os.environ.get("REPLICATE_API_TOKEN", "")
+    rep_val = str(rep_val).strip()
+    if not rep_val:
         raise ValueError(
-            "Missing or empty configuration: api_keys.replicate_api_token (REPLICATE_API_TOKEN)"
+            "Missing Replicate API token: set api_keys.replicate_api_token in configs/config.yaml "
+            "or environment variable REPLICATE_API_TOKEN"
         )
-    values = {"REPLICATE_API_TOKEN": str(rep_val).strip()}
+    values = {"REPLICATE_API_TOKEN": rep_val}
     values["GPT_API_KEY"] = resolve_openrouter_api_key(api_cfg)
 
     base_url = api_cfg.get("base_url")

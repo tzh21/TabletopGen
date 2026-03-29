@@ -24,10 +24,13 @@ def _load_api_config():
         cfg = yaml.safe_load(f) or {}
     api = cfg.get("api_keys", {}) or {}
     proxy_cfg = cfg.get("proxy") or {}
+    rep = (api.get("replicate_api_token") or "").strip()
+    if not rep:
+        rep = (os.environ.get("REPLICATE_API_TOKEN") or "").strip()
     return {
         "gpt_api_key": resolve_openrouter_api_key(api),
         "base_url": (api.get("base_url") or "https://openrouter.ai/api/v1").strip(),
-        "replicate_api_token": (api.get("replicate_api_token") or "").strip(),
+        "replicate_api_token": rep,
         "http_proxy": (proxy_cfg.get("http") or "").strip() or None,
     }
 
@@ -171,11 +174,14 @@ if __name__ == "__main__":
     conf = _load_api_config()
     if not conf["gpt_api_key"]:
         raise SystemExit(
-            "Missing OpenRouter key: set OPENROUTER_API_KEY (or GPT_API_KEY), "
-            "or api_keys.gpt_api_key in configs/config.yaml"
+            "Missing OpenRouter key: set api_keys.gpt_api_key in configs/config.yaml, "
+            "or OPENROUTER_API_KEY (or GPT_API_KEY) in the environment"
         )
     if not conf["replicate_api_token"]:
-        raise SystemExit("Missing api_keys.replicate_api_token in configs/config.yaml")
+        raise SystemExit(
+            "Missing Replicate token: set api_keys.replicate_api_token in configs/config.yaml, "
+            "or REPLICATE_API_TOKEN in the environment"
+        )
 
     client = setup_openai_client(conf["gpt_api_key"], conf["http_proxy"], conf["base_url"])
 
