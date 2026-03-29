@@ -150,7 +150,7 @@ def step1_get_asset_image(scene_dir):
         
     except Exception as e:
         logger.error(f"Step 1 failed: {e}")
-        return False
+        raise
 
 def step2_inpaint_occlusion(scene_dir):
     """

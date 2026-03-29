@@ -87,6 +87,8 @@ def get_extensions():
         extension = CUDAExtension
         sources += source_cuda
         define_macros += [("WITH_CUDA", None)]
+        # Include sm_89 (Ada) and sm_90 (Hopper, e.g. H100/H200); omitting them causes
+        # "no kernel image is available for execution on the device" on those GPUs.
         extra_compile_args["nvcc"] = [
             "-DCUDA_HAS_FP16=1",
             "-D__CUDA_NO_HALF_OPERATORS__",
@@ -96,6 +98,8 @@ def get_extensions():
             "-gencode=arch=compute_75,code=sm_75",
             "-gencode=arch=compute_80,code=sm_80",
             "-gencode=arch=compute_86,code=sm_86",
+            "-gencode=arch=compute_89,code=sm_89",
+            "-gencode=arch=compute_90,code=sm_90",
         ]
     else:
         print("Compiling without CUDA")

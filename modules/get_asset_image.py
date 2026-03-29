@@ -383,34 +383,49 @@ def segment_image(image_path, text_prompt, output_dir, occlusion_info=None, box_
                 DEVICE = "cpu"
             else:
                 raise
+
+        # Log Grounding DINO score for each proposal (after DINO box/text thresholds only)
+        _dino_conf = confidences.detach().cpu().reshape(-1)
+        if _dino_conf.numel() == 0:
+            msg = (
+                "Grounding DINO returned no boxes above box_threshold / text_threshold; "
+                "nothing to score against confidence_threshold."
+            )
+            logger.error(msg)
+            raise RuntimeError(msg)
+        _dino_scores = _dino_conf.tolist()
+        _dino_parts = [f"{lb}: {s:.4f}" for lb, s in zip(labels, _dino_scores)]
+        logger.info(
+            "Grounding DINO per-object scores (before pipeline confidence_threshold=%s): %s",
+            confidence_threshold,
+            "; ".join(_dino_parts),
+        )
         
         # Add confidence filtering
         valid_indices = confidences >= confidence_threshold
         
         if valid_indices.sum() == 0:
-            logger.warning(f"No objects with confidence >= {confidence_threshold} detected! Please try adjusting the prompt or lowering the threshold.")
-            return {
-                "image_path": image_path,
-                "objects": [],
-                "img_width": image_source.shape[1],
-                "img_height": image_source.shape[0]
-            }
+            msg = (
+                f"No object reached confidence_threshold={confidence_threshold}. "
+                f"Grounding DINO scores: {'; '.join(_dino_parts)}. "
+                "Try lowering confidence_threshold or box_threshold/text_threshold, or adjust the VLM prompt."
+            )
+            logger.error(msg)
+            raise RuntimeError(msg)
         
         # Filter detection results
         boxes = boxes[valid_indices]
         confidences = confidences[valid_indices]
         labels = [labels[i] for i in range(len(labels)) if valid_indices[i]]
         
-        # logger.info(f"After confidence filtering (>= {confidence_threshold}): {len(boxes)} objects remaining")
-        
-        if len(boxes) == 0:
-            logger.warning("No objects detected! Please try adjusting the prompt or lowering the threshold.")
-            return {
-                "image_path": image_path,
-                "objects": [],
-                "img_width": image_source.shape[1],
-                "img_height": image_source.shape[0]
-            }
+        _kept = confidences.detach().cpu().reshape(-1).tolist()
+        _kept_parts = [f"{lb}: {s:.4f}" for lb, s in zip(labels, _kept)]
+        logger.info(
+            "Per-object scores after confidence_threshold>=%s (%d kept): %s",
+            confidence_threshold,
+            len(labels),
+            "; ".join(_kept_parts),
+        )
         
         logger.info(f"Detected {len(boxes)} objects")
         
