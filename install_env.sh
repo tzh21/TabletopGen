@@ -29,6 +29,9 @@ echo "Installing PyTorch for tabletopgen (CUDA 11.8)..."
 
 pip install --extra-index-url https://download.pytorch.org/whl/cu118 torch==2.6.0+cu118 torchvision==0.21.0+cu118 torchaudio==2.6.0+cu118
 
+# Used for compiling Grounded-SAM-2
+conda install -c conda-forge gcc=11 gxx=11
+
 echo "Compiling Grounded-SAM-2..."
 cd Grounded-SAM-2
 # CUDA_HOME should be exported by the user before running this script
