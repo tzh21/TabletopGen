@@ -94,7 +94,6 @@ if __name__ == "__main__":
     print("=========================================================")
     
     for item in weights_to_download:
-        print(f"URL: {github_proxy_url(item["url"]), item["path"]}")
         download_file(github_proxy_url(item["url"]), item["path"])
         
     print("\n All weights downloaded successfully!")
