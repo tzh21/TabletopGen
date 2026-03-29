@@ -5,7 +5,8 @@ Redraw the object images and generate 3D models of each object.
 import os
 import json
 import shutil
-from concurrent.futures import ThreadPoolExecutor, as_completed
+import time
+from concurrent.futures import ThreadPoolExecutor
 from modules.seedream40_API import generate_object_image
 from modules.hunyuan3D_API import gen_single_obj_hy3dapi
 
@@ -93,7 +94,7 @@ def redraw_and_3dgen_api(segmentation_json_path, output_dir, replicate_api_token
     print(f"\nRedraw result JSON saved: {redraw_json_path}")
     
     # Step 2: Generate 3D models (using thread pool with retries)
-    print("\n--- b. Generate 3D models (up to 3 concurrent) ---")
+    print("\n--- b. Generate 3D models (up to 1 concurrent) ---")
     
     def generate_3d_task(obj):
         """Single 3D generation task"""
@@ -155,13 +156,18 @@ def redraw_and_3dgen_api(segmentation_json_path, output_dir, replicate_api_token
             for obj in objects_to_process:
                 print(f"  - {obj['class_name']}")
         
-        # Use thread pool, up to 3 concurrent
-        with ThreadPoolExecutor(max_workers=3) as executor:
-            future_to_obj = {executor.submit(generate_3d_task, obj): obj for obj in objects_to_process}
-            
-            for future in as_completed(future_to_obj):
+        # Use thread pool, 1 worker (sequential) to reduce API job-limit errors;
+        # 30s pause between objects to ease provider job / rate limits.
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            futures = [
+                executor.submit(generate_3d_task, obj) for obj in objects_to_process
+            ]
+            for i, future in enumerate(futures):
                 obj, glb_path = future.result()
                 obj['glb_path'] = glb_path
+                if i < len(futures) - 1:
+                    print("\nPausing 30s before next 3D generation...")
+                    time.sleep(30)
         
         # Check object counts
         total_objects = len(objects)

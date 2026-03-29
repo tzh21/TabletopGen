@@ -4,6 +4,7 @@ Replicate Python client wrappers for bytedance/seedream-4 and tencent/hunyuan-3d
 
 from __future__ import annotations
 
+import base64
 import os
 from pathlib import Path
 from typing import Any, BinaryIO, List, Optional, Sequence, Union
@@ -14,6 +15,16 @@ from replicate.exceptions import ModelError, ReplicateError
 
 MODEL_SEEDREAM = "bytedance/seedream-4"
 MODEL_HUNYUAN = "tencent/hunyuan-3d-3.1"
+
+# Hunyuan infers format from the image URI; Replicate file URLs often have no extension,
+# which yields "Unsupported image format: ." — data URIs carry an explicit MIME type.
+_MIME_BY_SUFFIX = {
+    ".png": "image/png",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".webp": "image/webp",
+}
+_HUNYUAN_MAX_IMAGE_BYTES = 6 * 1024 * 1024
 
 
 def resolve_replicate_token(replicate_api_token: Optional[str] = None) -> str:
@@ -61,6 +72,24 @@ def _run_model(
         raise RuntimeError(msg) from e
     except ReplicateError as e:
         raise RuntimeError(f"Replicate API error: {e}") from e
+
+
+def image_uri_for_hunyuan3d(image_path: Union[str, Path]) -> str:
+    """
+    Build the `image` field for tencent/hunyuan-3d-3.1.
+
+    Replicate-hosted file URLs often lack a file extension; Hunyuan then reports
+    "Unsupported image format: .". A data URI embeds the MIME type explicitly.
+    """
+    path = Path(image_path)
+    data = path.read_bytes()
+    if len(data) > _HUNYUAN_MAX_IMAGE_BYTES:
+        raise ValueError(
+            f"Image too large for Hunyuan 3D (max {_HUNYUAN_MAX_IMAGE_BYTES} bytes): {path}"
+        )
+    mime = _MIME_BY_SUFFIX.get(path.suffix.lower()) or "image/png"
+    b64 = base64.b64encode(data).decode("ascii")
+    return f"data:{mime};base64,{b64}"
 
 
 def download_url_to_file(url: str, dest_path: Union[str, Path], timeout_s: int = 300) -> None:
@@ -154,16 +183,12 @@ def run_hunyuan3d_image_to_glb(
     """
     client = _client(replicate_api_token)
     path = Path(image_path)
-    f = open(path, "rb")
-    try:
-        inp = {
-            "image": f,
-            "enable_pbr": enable_pbr,
-            "face_count": face_count,
-            "generate_type": generate_type,
-        }
-        out = _run_model(client, MODEL_HUNYUAN, inp)
-    finally:
-        f.close()
+    inp = {
+        "image": image_uri_for_hunyuan3d(path),
+        "enable_pbr": enable_pbr,
+        "face_count": face_count,
+        "generate_type": generate_type,
+    }
+    out = _run_model(client, MODEL_HUNYUAN, inp)
     url = _extract_http_url(out)
     download_url_to_file(url, output_glb_path)

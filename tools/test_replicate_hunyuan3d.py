@@ -5,9 +5,16 @@ import argparse
 import json
 import os
 import sys
+from pathlib import Path
+
+_REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _REPO_ROOT not in sys.path:
+    sys.path.insert(0, _REPO_ROOT)
 
 from replicate.client import Client
 from replicate.exceptions import ModelError, ReplicateError
+
+from modules.replicate_client import image_uri_for_hunyuan3d
 
 MODEL_REF = "tencent/hunyuan-3d-3.1"
 
@@ -88,14 +95,13 @@ def main() -> int:
             if not os.path.isfile(args.image):
                 print(f"错误: 图片不存在: {args.image}", file=sys.stderr)
                 return 1
-            with open(args.image, "rb") as f:
-                inp = {
-                    "image": f,
-                    "enable_pbr": args.enable_pbr,
-                    "face_count": args.face_count,
-                    "generate_type": args.generate_type,
-                }
-                out = _run(inp)
+            inp = {
+                "image": image_uri_for_hunyuan3d(Path(args.image)),
+                "enable_pbr": args.enable_pbr,
+                "face_count": args.face_count,
+                "generate_type": args.generate_type,
+            }
+            out = _run(inp)
             print(f"模型: {MODEL_REF} (image-to-3D)")
         else:
             prompt = args.prompt if args.prompt is not None else DEFAULT_PROMPT
