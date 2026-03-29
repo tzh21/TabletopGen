@@ -6,6 +6,14 @@ from tqdm import tqdm
 
 from pathlib import Path
 ROOT_DIR = Path(__file__).resolve().parent.parent
+GH_PROXY_PREFIX = "https://gh-proxy.com/"
+
+
+def github_proxy_url(url: str) -> str:
+    if "github.com" in url:
+        return GH_PROXY_PREFIX + url
+    return url
+
 
 def download_file(url, relative_path):
     save_path = ROOT_DIR / relative_path
@@ -86,6 +94,7 @@ if __name__ == "__main__":
     print("=========================================================")
     
     for item in weights_to_download:
-        download_file(item["url"], item["path"])
+        print(f"URL: {github_proxy_url(item["url"]), item["path"]}")
+        download_file(github_proxy_url(item["url"]), item["path"])
         
     print("\n All weights downloaded successfully!")

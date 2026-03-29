@@ -10,11 +10,19 @@ echo "========================================================="
 # 1. Initialize Conda
 eval "$(conda shell.bash hook)"
 
+conda_env_exists() {
+  conda env list | awk '!/^#/ && NF {print $1}' | grep -qx "$1"
+}
+
 # ==========================================
 # Part 1: Install TableTopGen (main environment)
 # ==========================================
-echo "[1/2] Creating environment: tabletopgen..."
-conda create -n tabletopgen python=3.10 -y
+if conda_env_exists tabletopgen; then
+  echo "[1/2] Environment tabletopgen already exists, skipping conda create."
+else
+  echo "[1/2] Creating environment: tabletopgen..."
+  conda create -n tabletopgen python=3.10 -y
+fi
 conda activate tabletopgen
 
 echo "Installing PyTorch for tabletopgen (CUDA 11.8)..."
@@ -71,9 +79,13 @@ echo "TableTopGen Installed Successfully!"
 # ==========================================
 # Part 2: Install Rotation (sub-environment)
 # ==========================================
-echo "[2/2] Creating environment: rotation..."
 conda deactivate
-conda create -n rotation python=3.10 -y
+if conda_env_exists rotation; then
+  echo "[2/2] Environment rotation already exists, skipping conda create."
+else
+  echo "[2/2] Creating environment: rotation..."
+  conda create -n rotation python=3.10 -y
+fi
 conda activate rotation
 
 echo "Installing PyTorch for rotation (CUDA 12.1)..."
