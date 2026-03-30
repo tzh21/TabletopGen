@@ -86,6 +86,14 @@ print(f"Pipeline directory: {PIPELINE_DIR}")
 sys.path.append(PIPELINE_DIR)
 os.environ['PIPELINE_DIR'] = PIPELINE_DIR
 
+# Subprocesses (e.g. conda run python modules/...) only get the script dir on sys.path;
+# top-level packages like configs live at repo root.
+_repo_root = PIPELINE_DIR
+_existing_pp = os.environ.get("PYTHONPATH", "")
+os.environ["PYTHONPATH"] = (
+    _repo_root if not _existing_pp else f"{_repo_root}{os.pathsep}{_existing_pp}"
+)
+
 # Load configuration
 CONFIG_VALUES, _RAW_CONFIG = load_config()
 REPLICATE_API_TOKEN = CONFIG_VALUES["REPLICATE_API_TOKEN"]

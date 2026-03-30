@@ -1,8 +1,15 @@
 """
 Run the independent script for rotation estimation in the rotation virtual environment.
 """
-import sys
 import os
+import sys
+
+# `python .../modules/run_rotation_estimation.py` puts only `modules/` on sys.path; the
+# `configs` package lives at repo root. Conda run may also drop inherited PYTHONPATH.
+_repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+if _repo_root not in sys.path:
+    sys.path.insert(0, _repo_root)
+
 
 def main():
     if len(sys.argv) != 5:
